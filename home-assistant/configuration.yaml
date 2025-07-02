@@ -1,0 +1,63 @@
+######
+## you should have some other configuration, just add this part to your existing configuration.yaml.
+######
+# Example configuration.yaml entry for AccuWeather sensor
+sensor:
+  - platform: template
+    sensors:
+      accuweather_sensor:
+        friendly_name: "AccuWeather Display Data"
+        unique_id: "accuweather_display_sensor_v1"
+        value_template: "{{ now().strftime('%Y-%m-%d %H:%M') }}"
+        attribute_templates:
+          # Current conditions from AccuWeather
+          current_temperature: "{{ state_attr('weather.home', 'temperature') | float(0) | round(0) }}"
+          current_condition: "{{ states('weather.home') }}"
+          current_humidity: "{{ state_attr('weather.home', 'humidity') | float(0) | round(0) }}"
+          current_pressure: "{{ state_attr('weather.home', 'pressure') | float(0) | round(0) }}"
+          wind_speed: "{{ state_attr('weather.home', 'wind_speed') | float(0) | round(1) }}"
+          wind_bearing: "{{ state_attr('weather.home', 'wind_bearing') | int(0) }}"
+          uv_index: "{{ state_attr('weather.home', 'uv_index') | float(0) | round(1) }}"
+          cloud_coverage: "{{ state_attr('weather.home', 'cloud_coverage') | int(0) }}"
+          hours_of_sun: "{{ states('sensor.home_hours_of_sun_day_0') | float(0) | round(1) }}"
+          precipitation: "{{ states('sensor.home_precipitation') | float(0) | round(1) }}"
+          today_condition_text: "{{ states('sensor.home_condition_day_0') }}"
+          cloud_ceiling: "{{ states('sensor.home_cloud_ceiling') | float(0) | round(1) }}"
+          air_quality: "{{ states('sensor.home_air_quality_day_0') }}"
+
+          # Today (day 0)
+          today_high: "{{ states('sensor.home_realfeel_temperature_max_day_0') | float(0) | round(0) }}"
+          today_low: "{{ states('sensor.home_realfeel_temperature_min_day_0') | float(0) | round(0) }}"
+          today_condition: "{{ states('weather.home') }}"
+
+          # Tomorrow (day 1)
+          day1_high: "{{ states('sensor.home_realfeel_temperature_max_day_1') | float(0) | round(0) }}"
+          day1_low: "{{ states('sensor.home_realfeel_temperature_min_day_1') | float(0) | round(0) }}"
+          day1_condition: "sunny" # We'll need to add condition sensors if available
+          day1_name: >
+            {% set days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+            {{ days[(now().weekday() + 1) % 7] }}
+
+          # Day 2
+          day2_high: "{{ states('sensor.home_realfeel_temperature_max_day_2') | float(0) | round(0) }}"
+          day2_low: "{{ states('sensor.home_realfeel_temperature_min_day_2') | float(0) | round(0) }}"
+          day2_condition: "cloudy"
+          day2_name: >
+            {% set days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+            {{ days[(now().weekday() + 2) % 7] }}
+
+          # Day 3
+          day3_high: "{{ states('sensor.home_realfeel_temperature_max_day_3') | float(0) | round(0) }}"
+          day3_low: "{{ states('sensor.home_realfeel_temperature_min_day_3') | float(0) | round(0) }}"
+          day3_condition: "sunny"
+          day3_name: >
+            {% set days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+            {{ days[(now().weekday() + 3) % 7] }}
+
+          # Day 4
+          day4_high: "{{ states('sensor.home_realfeel_temperature_max_day_4') | float(0) | round(0) }}"
+          day4_low: "{{ states('sensor.home_realfeel_temperature_min_day_4') | float(0) | round(0) }}"
+          day4_condition: "partlycloudy"
+          day4_name: >
+            {% set days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+            {{ days[(now().weekday() + 4) % 7] }}

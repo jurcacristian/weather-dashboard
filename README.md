@@ -58,7 +58,6 @@ The following AccuWeather sensors must be available in Home Assistant:
 - `sensor.home_precipitation`
 - `sensor.home_condition_day_0` - Detailed weather description
 - `sensor.home_air_quality_day_0`
-- `sensor.home_uv_index_day_0` through `day_4`
 - `sensor.home_cloud_ceiling_day_0`
 
 ## Installation

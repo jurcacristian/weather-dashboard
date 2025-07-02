@@ -1,0 +1,564 @@
+esphome:
+  name: xiao-seed
+  friendly_name: xiao-seed
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "GENERATE YOUR API KEY FROM ESPHOME DASHBOARD"
+
+ota:
+  - platform: esphome
+    password: "GENERATE YOUR OTA PASSWORD FROM ESPHOME DASHBOARD"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+captive_portal:
+
+# Required for display timing
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    on_time:
+      # Update every 15 minutes between 6 AM and 10 AM
+      - seconds: 0
+        minutes: /15
+        hours: 6-9
+        then:
+          - component.update: epaper_display
+      
+      # Update every hour from 10 AM to midnight
+      - seconds: 0
+        minutes: 0
+        hours: 10-23
+        then:
+          - component.update: epaper_display
+
+# SPI Interface (pre-connected inside the enclosure)
+spi:
+  clk_pin: GPIO8
+  mosi_pin: GPIO10
+
+# Display Configuration
+display:
+  - platform: waveshare_epaper
+    id: epaper_display
+    model: 7.50inv2
+    cs_pin: GPIO3
+    dc_pin: GPIO5
+    busy_pin:
+      number: GPIO4
+      inverted: true  # Critical for V2 display
+    reset_pin: GPIO2
+    reset_duration: 2ms
+    update_interval: never  # Controlled by time component
+    lambda: |-
+      // Clear display
+      it.clear();
+      
+      // Left side - Current conditions
+      // Large temperature with high/low on the same line
+      if (id(current_temperature).has_state() && id(today_high).has_state() && id(today_low).has_state()) {
+        it.printf(235, 20, id(font_xlarge), TextAlign::TOP_CENTER, 
+                  "%.0f°", id(current_temperature).state);
+        it.printf(200, 205, id(font_medium), TextAlign::TOP_CENTER,
+                  "H: %.0f°  L: %.0f°", id(today_high).state, id(today_low).state);
+      }
+      
+      // Current condition description in a constrained box
+      if (id(today_condition_text).has_state()) {
+        // Word wrap the condition text in a box
+        // Box dimensions: x=30, y=250, width=340, height=75 (3 lines * 25)
+        std::string condition = id(today_condition_text).state;
+        
+        int x_start = 25;  // Text will start exactly at x=30
+        int y_start = 250;
+        int line_height = 25;
+        
+        // Split text into words
+        std::vector<std::string> words;
+        std::string current_word = "";
+        for (char c : condition) {
+          if (c == ' ') {
+            if (!current_word.empty()) {
+              words.push_back(current_word);
+              current_word = "";
+            }
+          } else {
+            current_word += c;
+          }
+        }
+        if (!current_word.empty()) {
+          words.push_back(current_word);
+        }
+        
+        // Build lines without breaking words
+        std::vector<std::string> lines;
+        std::string current_line = "";
+        
+        for (const auto& word : words) {
+          std::string test_line = current_line.empty() ? word : current_line + " " + word;
+          
+          // Check if line would be too long (42 chars max)
+          if (test_line.length() > 42 && !current_line.empty()) {
+            lines.push_back(current_line);
+            current_line = word;
+          } else {
+            current_line = test_line;
+          }
+        }
+        if (!current_line.empty()) {
+          lines.push_back(current_line);
+        }
+        
+        // Draw up to 3 lines with LEFT alignment
+        for (int i = 0; i < std::min(3, (int)lines.size()); i++) {
+          it.print(x_start, y_start + (i * line_height), 
+                   id(font_small), TextAlign::TOP_LEFT, lines[i].c_str());
+        }
+      }
+      
+      // Right side - Additional info
+      // Air Quality
+      if (id(air_quality).has_state()) {
+        it.print(495, 10, id(font_small), "Air Quality:");
+        it.printf(660, 10, id(font_small), "%s", id(air_quality).state.c_str());
+      }
+
+      // Hours of sun
+      if (id(hours_of_sun).has_state()) {
+        it.print(495, 40, id(font_small), "Sun Hours:");
+        it.printf(660, 40, id(font_small), "%.1f h", id(hours_of_sun).state);
+      }
+      
+      // Precipitation
+      if (id(precipitation).has_state()) {
+        it.print(495, 70, id(font_small), "Precip:");
+        it.printf(660, 70, id(font_small), "%.1f mm", id(precipitation).state);
+      }
+      
+      // Humidity (change Y position from 100 to 130)
+      if (id(current_humidity).has_state()) {
+        it.print(495, 100, id(font_small), "Humidity:");
+        it.printf(660, 100, id(font_small), "%.0f%%", id(current_humidity).state);
+      }
+      
+      // Pressure
+      if (id(current_pressure).has_state()) {
+        it.print(495, 130, id(font_small), "Pressure:");
+        it.printf(660, 130, id(font_small), "%.0f hPa", id(current_pressure).state);
+      }
+      
+      // Wind
+      if (id(wind_speed).has_state()) {
+        it.print(495, 160, id(font_small), "Wind:");
+        it.printf(660, 160, id(font_small), "%.1f km/h", id(wind_speed).state);
+      }
+      
+      // Wind bearing
+      if (id(wind_bearing).has_state()) {
+        it.print(495, 190, id(font_small), "Wind Dir:");
+        // Convert bearing to compass direction
+        float bearing = id(wind_bearing).state;
+        const char* dir = "N";
+        if (bearing >= 11.25 && bearing < 33.75) dir = "NNE";
+        else if (bearing >= 33.75 && bearing < 56.25) dir = "NE";
+        else if (bearing >= 56.25 && bearing < 78.75) dir = "ENE";
+        else if (bearing >= 78.75 && bearing < 101.25) dir = "E";
+        else if (bearing >= 101.25 && bearing < 123.75) dir = "ESE";
+        else if (bearing >= 123.75 && bearing < 146.25) dir = "SE";
+        else if (bearing >= 146.25 && bearing < 168.75) dir = "SSE";
+        else if (bearing >= 168.75 && bearing < 191.25) dir = "S";
+        else if (bearing >= 191.25 && bearing < 213.75) dir = "SSW";
+        else if (bearing >= 213.75 && bearing < 236.25) dir = "SW";
+        else if (bearing >= 236.25 && bearing < 258.75) dir = "WSW";
+        else if (bearing >= 258.75 && bearing < 281.25) dir = "W";
+        else if (bearing >= 281.25 && bearing < 303.75) dir = "WNW";
+        else if (bearing >= 303.75 && bearing < 326.25) dir = "NW";
+        else if (bearing >= 326.25 && bearing < 348.75) dir = "NNW";
+        it.printf(660, 190, id(font_small), "%s", dir);
+      }
+      
+      // UV Index
+      if (id(uv_index).has_state()) {
+        it.print(495, 220, id(font_small), "UV Index:");
+        it.printf(660, 220, id(font_small), "%.1f", id(uv_index).state);
+      }
+      
+      // Cloud coverage
+      if (id(cloud_coverage).has_state()) {
+        it.print(495, 250, id(font_small), "Clouds:");
+        it.printf(660, 250, id(font_small), "%.0f%%", id(cloud_coverage).state);
+      }
+
+      // Cloud ceiling
+      if (id(cloud_ceiling).has_state()) {
+        it.print(495, 280, id(font_small), "Cloud Ceiling:");
+        it.printf(660, 280, id(font_small), "%.1f m", id(cloud_ceiling).state);
+      }
+      
+      // Forecast section - 5 days with AccuWeather data
+      // Day columns - adjusted spacing for 5 days
+      int x_positions[] = {100, 240, 380, 520, 660};
+      
+      // Helper function to draw weather icons
+      auto draw_weather_icon = [&it](int x, int y, std::string condition) {
+        if (condition == "sunny" || condition == "clear-night") {
+          // Sun icon - circle with rays
+          it.circle(x, y, 15);
+          // Draw sun rays
+          for (int i = 0; i < 8; i++) {
+            float angle = i * M_PI / 4;
+            int x1 = x + cos(angle) * 20;
+            int y1 = y + sin(angle) * 20;
+            int x2 = x + cos(angle) * 25;
+            int y2 = y + sin(angle) * 25;
+            it.line(x1, y1, x2, y2);
+          }
+        } else if (condition == "cloudy" || condition == "fog") {
+          // Cloud icon - overlapping circles
+          it.filled_circle(x - 8, y, 12);
+          it.filled_circle(x + 8, y, 12);
+          it.filled_circle(x, y - 8, 12);
+          it.filled_rectangle(x - 8, y - 5, 16, 10);
+        } else if (condition == "partlycloudy") {
+          // Sun behind cloud
+          it.circle(x - 5, y - 5, 12);
+          it.filled_circle(x + 5, y + 5, 12);
+          it.filled_circle(x + 12, y + 5, 10);
+        } else if (condition == "rainy" || condition == "pouring") {
+          // Cloud with rain
+          it.filled_circle(x, y - 10, 12);
+          it.filled_circle(x - 8, y - 10, 10);
+          it.filled_circle(x + 8, y - 10, 10);
+          // Rain drops
+          it.line(x - 5, y, x - 5, y + 10);
+          it.line(x, y, x, y + 10);
+          it.line(x + 5, y, x + 5, y + 10);
+        } else if (condition == "snowy") {
+          // Snowflake
+          it.line(x - 10, y, x + 10, y);
+          it.line(x, y - 10, x, y + 10);
+          it.line(x - 7, y - 7, x + 7, y + 7);
+          it.line(x - 7, y + 7, x + 7, y - 7);
+        } else {
+          // Default circle for unknown conditions
+          it.circle(x, y, 15);
+        }
+      };
+      
+      // Today
+      it.print(x_positions[0], 350, id(font_small), TextAlign::CENTER, "Today");
+      if (id(today_high).has_state() && id(today_low).has_state()) {
+        it.printf(x_positions[0], 375, id(font_small), TextAlign::CENTER, 
+                  "%.0f°/%.0f°", id(today_high).state, id(today_low).state);
+      }
+      if (id(today_condition).has_state()) {
+        draw_weather_icon(x_positions[0], 420, id(today_condition).state.c_str());
+      }
+      
+      // Day 1
+      if (id(day1_name).has_state()) {
+        it.printf(x_positions[1], 350, id(font_small), TextAlign::CENTER, "%s", id(day1_name).state.c_str());
+        it.printf(x_positions[1], 375, id(font_small), TextAlign::CENTER, 
+                  "%.0f°/%.0f°", id(day1_high).state, id(day1_low).state);
+        if (id(day1_condition).has_state()) {
+          draw_weather_icon(x_positions[1], 420, id(day1_condition).state.c_str());
+        }
+      }
+      
+      // Day 2
+      if (id(day2_name).has_state()) {
+        it.printf(x_positions[2], 350, id(font_small), TextAlign::CENTER, "%s", id(day2_name).state.c_str());
+        it.printf(x_positions[2], 375, id(font_small), TextAlign::CENTER, 
+                  "%.0f°/%.0f°", id(day2_high).state, id(day2_low).state);
+        if (id(day2_condition).has_state()) {
+          draw_weather_icon(x_positions[2], 420, id(day2_condition).state.c_str());
+        }
+      }
+      
+      // Day 3
+      if (id(day3_name).has_state()) {
+        it.printf(x_positions[3], 350, id(font_small), TextAlign::CENTER, "%s", id(day3_name).state.c_str());
+        it.printf(x_positions[3], 375, id(font_small), TextAlign::CENTER, 
+                  "%.0f°/%.0f°", id(day3_high).state, id(day3_low).state);
+        if (id(day3_condition).has_state()) {
+          draw_weather_icon(x_positions[3], 420, id(day3_condition).state.c_str());
+        }
+      }
+      
+      // Day 4
+      if (id(day4_name).has_state()) {
+        it.printf(x_positions[4], 350, id(font_small), TextAlign::CENTER, "%s", id(day4_name).state.c_str());
+        it.printf(x_positions[4], 375, id(font_small), TextAlign::CENTER, 
+                  "%.0f°/%.0f°", id(day4_high).state, id(day4_low).state);
+        if (id(day4_condition).has_state()) {
+          draw_weather_icon(x_positions[4], 420, id(day4_condition).state.c_str());
+        }
+      }
+      
+      // Bottom info - aligned to right corner
+      it.printf(795, 475, id(font_tiny), TextAlign::BOTTOM_RIGHT, 
+                "Updated: %s", id(homeassistant_time).now().strftime("%d/%m %H:%M").c_str());
+
+# Fonts
+font:
+  - file: 
+      type: gfonts
+      family: Roboto
+    id: font_tiny
+    size: 16
+  - file: 
+      type: gfonts
+      family: Roboto
+    id: font_small
+    size: 24
+  - file: 
+      type: gfonts
+      family: Roboto
+    id: font_medium
+    size: 30
+  - file: 
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font_large
+    size: 72
+  - file: 
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font_xlarge
+    size: 185
+
+# Weather data sensors - ALL POINTING TO sensor.accuweather_sensor
+sensor:
+  - platform: homeassistant
+    id: current_temperature
+    entity_id: sensor.accuweather_sensor
+    attribute: current_temperature
+    internal: true
+
+  - platform: homeassistant
+    id: current_humidity
+    entity_id: sensor.accuweather_sensor
+    attribute: current_humidity
+    internal: true
+
+  - platform: homeassistant
+    id: current_pressure
+    entity_id: sensor.accuweather_sensor
+    attribute: current_pressure
+    internal: true
+
+  - platform: homeassistant
+    id: wind_speed
+    entity_id: sensor.accuweather_sensor
+    attribute: wind_speed
+    internal: true
+
+  - platform: homeassistant
+    id: wind_bearing
+    entity_id: sensor.accuweather_sensor
+    attribute: wind_bearing
+    internal: true
+
+  - platform: homeassistant
+    id: uv_index
+    entity_id: sensor.accuweather_sensor
+    attribute: uv_index
+    internal: true
+
+  - platform: homeassistant
+    id: cloud_coverage
+    entity_id: sensor.accuweather_sensor
+    attribute: cloud_coverage
+    internal: true
+
+  - platform: homeassistant
+    id: cloud_ceiling
+    entity_id: sensor.accuweather_sensor
+    attribute: cloud_ceiling
+    internal: true
+
+  - platform: homeassistant
+    id: hours_of_sun
+    entity_id: sensor.accuweather_sensor
+    attribute: hours_of_sun
+    internal: true
+
+  - platform: homeassistant
+    id: precipitation
+    entity_id: sensor.accuweather_sensor
+    attribute: precipitation
+    internal: true
+
+  - platform: homeassistant
+    id: today_high
+    entity_id: sensor.accuweather_sensor
+    attribute: today_high
+    internal: true
+
+  - platform: homeassistant
+    id: today_low
+    entity_id: sensor.accuweather_sensor
+    attribute: today_low
+    internal: true
+    
+  - platform: homeassistant
+    id: day1_high
+    entity_id: sensor.accuweather_sensor
+    attribute: day1_high
+    internal: true
+    
+  - platform: homeassistant
+    id: day1_low
+    entity_id: sensor.accuweather_sensor
+    attribute: day1_low
+    internal: true
+    
+  - platform: homeassistant
+    id: day2_high
+    entity_id: sensor.accuweather_sensor
+    attribute: day2_high
+    internal: true
+    
+  - platform: homeassistant
+    id: day2_low
+    entity_id: sensor.accuweather_sensor
+    attribute: day2_low
+    internal: true
+    
+  - platform: homeassistant
+    id: day3_high
+    entity_id: sensor.accuweather_sensor
+    attribute: day3_high
+    internal: true
+    
+  - platform: homeassistant
+    id: day3_low
+    entity_id: sensor.accuweather_sensor
+    attribute: day3_low
+    internal: true
+    
+  - platform: homeassistant
+    id: day4_high
+    entity_id: sensor.accuweather_sensor
+    attribute: day4_high
+    internal: true
+    
+  - platform: homeassistant
+    id: day4_low
+    entity_id: sensor.accuweather_sensor
+    attribute: day4_low
+    internal: true
+
+  # UV Index sensors for each day
+  - platform: homeassistant
+    id: today_uv
+    entity_id: sensor.accuweather_sensor
+    attribute: today_uv
+    internal: true
+    
+  - platform: homeassistant
+    id: day1_uv
+    entity_id: sensor.accuweather_sensor
+    attribute: day1_uv
+    internal: true
+    
+  - platform: homeassistant
+    id: day2_uv
+    entity_id: sensor.accuweather_sensor
+    attribute: day2_uv
+    internal: true
+    
+  - platform: homeassistant
+    id: day3_uv
+    entity_id: sensor.accuweather_sensor
+    attribute: day3_uv
+    internal: true
+    
+  - platform: homeassistant
+    id: day4_uv
+    entity_id: sensor.accuweather_sensor
+    attribute: day4_uv
+    internal: true
+
+text_sensor:
+  - platform: homeassistant
+    id: current_condition
+    entity_id: sensor.accuweather_sensor
+    attribute: current_condition
+    internal: true
+
+  - platform: homeassistant
+    id: today_condition
+    entity_id: sensor.accuweather_sensor
+    attribute: today_condition
+    internal: true
+
+  - platform: homeassistant
+    id: day1_condition
+    entity_id: sensor.accuweather_sensor
+    attribute: day1_condition
+    internal: true
+    
+  - platform: homeassistant
+    id: day1_name
+    entity_id: sensor.accuweather_sensor
+    attribute: day1_name
+    internal: true
+    
+  - platform: homeassistant
+    id: day2_condition
+    entity_id: sensor.accuweather_sensor
+    attribute: day2_condition
+    internal: true
+    
+  - platform: homeassistant
+    id: day2_name
+    entity_id: sensor.accuweather_sensor
+    attribute: day2_name
+    internal: true
+    
+  - platform: homeassistant
+    id: day3_condition
+    entity_id: sensor.accuweather_sensor
+    attribute: day3_condition
+    internal: true
+    
+  - platform: homeassistant
+    id: day3_name
+    entity_id: sensor.accuweather_sensor
+    attribute: day3_name
+    internal: true
+    
+  - platform: homeassistant
+    id: day4_condition
+    entity_id: sensor.accuweather_sensor
+    attribute: day4_condition
+    internal: true
+    
+  - platform: homeassistant
+    id: day4_name
+    entity_id: sensor.accuweather_sensor
+    attribute: day4_name
+    internal: true
+
+  - platform: homeassistant
+    id: today_condition_text
+    entity_id: sensor.home_condition_day_0
+    internal: true
+
+  - platform: homeassistant
+    id: air_quality
+    entity_id: sensor.accuweather_sensor
+    attribute: air_quality
+    internal: true
