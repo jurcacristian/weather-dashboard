@@ -1,8 +1,8 @@
 # XIAO 7.5" ePaper Weather Dashboard
 
-A comprehensive weather dashboard for the Seeed Studio XIAO 7.5" ePaper Panel, integrating with Home Assistant and AccuWeather to display real-time weather data and 5-day forecasts.
+A weather dashboard for the Seeed Studio XIAO 7.5" ePaper Panel, integrating with Home Assistant and AccuWeather to display real-time weather data and 5-day forecasts.
 
-![Weather Dashboard](images/dashboard-preview.jpg) <!-- Add your actual dashboard photo -->
+![Weather Dashboard](images/dashboard-preview.jpg) 
 
 ## Features
 
@@ -224,4 +224,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Seeed Studio for the XIAO 7.5" ePaper Panel hardware
 - ESPHome community for the Waveshare ePaper driver
 - Home Assistant community for the platform
-- Weatherman Dashboard for ESPHome https://github.com/Madelena/esphome-weatherman-dashboard
+- Weatherman Dashboard for ESPHome https://github.com/Madelena/esphome-weatherman-dashboard and https://community.home-assistant.io/t/use-esphome-with-e-ink-displays-to-blend-in-with-your-home-decor/435428/455
+- wiki https://wiki.seeedstudio.com/xiao_075inch_epaper_panel/
