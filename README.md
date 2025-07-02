@@ -24,14 +24,13 @@ A comprehensive weather dashboard for the Seeed Studio XIAO 7.5" ePaper Panel, i
 - **5-Day Weather Forecast**
   - Daily high/low temperatures
   - Weather condition icons (sunny, cloudy, rainy, etc.)
-  - Day names
 
 - **Smart Power Management**
   - Dynamic refresh schedule:
-    - Every 5 minutes from 6 AM to 2 PM
-    - Every hour from 2 PM to midnight
+    - Update every 15 minutes between 6 AM and 10 AM
+    - Update every hour from 10 AM to midnight
     - Sleep mode from midnight to 6 AM
-  - Optimized for 2000mAh battery (3+ months battery life)
+  - Optimized for 2000mAh battery (3+ months battery life...this is still to be check, but i would not expect to last more 1 month. But a more granular schedule is possible like having more sleep when nobody is arround.)
 
 ## Hardware Requirements
 
@@ -41,6 +40,7 @@ A comprehensive weather dashboard for the Seeed Studio XIAO 7.5" ePaper Panel, i
   - 2000mAh battery
   - Pre-wired connections in enclosed case
   - USB Type-C for programming
+  - purchase link:  https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html 
 
 ## Software Prerequisites
 
@@ -163,14 +163,14 @@ The display uses smart scheduling to maximize battery life:
 ### Adjusting Refresh Schedule
 
 Modify the `time` component in the ESPHome configuration:
-
+### Example bellow updates the data every 10 minutes from 6 AM to 3PM . Everything else outside of this is considered to be sleep.
 ```yaml
 time:
   - platform: homeassistant
     id: homeassistant_time
     on_time:
       - seconds: 0
-        minutes: /5        # Update frequency
+        minutes: /10        # Update frequency
         hours: 6-14       # Active hours
         then:
           - component.update: epaper_display
