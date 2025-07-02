@@ -224,3 +224,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Seeed Studio for the XIAO 7.5" ePaper Panel hardware
 - ESPHome community for the Waveshare ePaper driver
 - Home Assistant community for the platform
+- Weatherman Dashboard for ESPHome https://github.com/Madelena/esphome-weatherman-dashboard
